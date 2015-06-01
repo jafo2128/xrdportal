@@ -14,7 +14,7 @@
 | path to your installation.
 |
 */
-$config['base_url']	= 'http://127.0.0.1/uj.xrd/';
+$config['base_url']	= 'http://127.0.0.1/xrd.portal/';
 
 /*
 |--------------------------------------------------------------------------
@@ -224,7 +224,7 @@ $config['cache_path'] = '';
 | MUST set an encryption key.  See the user guide for info.
 |
 */
-$config['encryption_key'] = 'kyvuil;06t68@#%';
+$config['encryption_key'] = 'kyvudsadadil;06t68@#%';
 
 /*
 |--------------------------------------------------------------------------
