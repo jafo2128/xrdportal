@@ -1,0 +1,472 @@
+function checkSession(url) {
+    jQuery.ajax({url: url+"index.php/login/is_session_expired", async: false, success: function(data) {
+		if (data == "true") {
+			window.location = url+"/index.php/view/home";
+		}
+	}});
+}
+
+var DashboardUI = {
+	
+    initialize: function(url) {
+    	var overlay;
+    	var map;
+    	var x;
+    	var y;
+		var myMarker;
+		this.userMarkers = [];
+		
+		this.url = url;
+		
+		var validateSession = setInterval(function(){checkSession(url)}, 60000);
+		
+		$('.form_datetime').datetimepicker({
+	        weekStart: 1,
+	        todayBtn:  1,
+			autoclose: 1,
+			todayHighlight: 1,
+			startView: 2,
+			forceParse: 0,
+	        showMeridian: 1
+	    });
+		
+		$('#filterform').bootstrapValidator({
+	        message: 'This value is not valid',
+	        feedbackIcons: {
+	            valid: 'glyphicon glyphicon-ok',
+	            validating: 'glyphicon glyphicon-refresh'
+	        },
+	        fields: {
+				fromdate: {
+					message: 'The from date and time is not valid',
+	                validators: {
+						notEmpty: {
+	                        message: 'The from date is required and cannot be empty'
+	                    }
+	                }
+				},
+				todate: {
+					message: 'The to date and time is not valid',
+	                validators: {
+						notEmpty: {
+	                        message: 'The to date is required and cannot be empty'
+	                    }
+	                }
+				}
+			}
+	    });
+		$('#map_filter_pad').click(function(e) {
+	            // Validate the date when user change it
+	            $('#filterform').bootstrapValidator('revalidateField', 'fromdate');
+				$('#filterform').bootstrapValidator('revalidateField', 'todate');
+	    });
+
+        var map_canvas = document.getElementById('map_canvas');
+        var map_options = {
+			center: new google.maps.LatLng(-26.204444, 28.045556),
+			zoom: 15,
+			mapTypeId: google.maps.MapTypeId.ROADMAP
+        };
+        this.map = new google.maps.Map(map_canvas, map_options);
+		map = this.map;
+		
+		var coordinates;
+		jQuery.ajax({url: url+"/index.php/location/my_location", async: false, success: function(data) {
+			coordinates = data;
+		}});	
+		if (coordinates != "nolocation") {
+			var location = coordinates.split(", ");
+			var lat = parseFloat(location[0]);
+			var lon = parseFloat(location[1]);
+			
+	        var marker = new google.maps.Marker({
+				position: new google.maps.LatLng(lat, lon), 
+				map: this.map, // handle of the map 
+				draggable:false,
+				icon:url+"/images/icons/youarehere.png",
+				zoomed: false
+	        });
+		
+			google.maps.event.addListener(marker, 'click', function() {
+				map.setCenter(marker.getPosition());
+				if (this.zoomed) {
+					this.zoomed = false;
+					map.setZoom(15);
+				}
+				else {
+					this.zoomed = true;
+					map.setZoom(18);
+				}
+			});
+			
+			this.myMarker = marker;
+		}
+		
+		var date_params;
+		jQuery.ajax({url: url+"/index.php/events/get_map_date_params", async: false, success: function(data) {
+				date_params = data;
+			}
+	    });
+		
+		date_params = $.parseJSON(date_params);
+		this.drawMapEvents(date_params);
+		this.drawReaVaya();
+		this.drawMapFriends();
+		
+
+        $('#scroll-pane').jScrollPane();
+
+        MyOverlay.prototype = new google.maps.OverlayView();
+        MyOverlay.prototype.onAdd = function() { }
+        MyOverlay.prototype.onRemove = function() { }
+        MyOverlay.prototype.draw = function() { }
+        function MyOverlay(map) { this.setMap(map); }
+
+        overlay = new MyOverlay(map);
+
+        google.maps.event.addListener(map, 'idle', function() { 
+            // Get projection
+            projection = overlay.getProjection();
+        });
+		$(".panel-expand").click(function() { 
+			var sel = "#"+$(this).attr('name')+"-body";
+			$(sel).toggle("fast");
+	    }); 
+    },
+	
+	refreshMap: function() {
+		var coordinates;
+		var url = this.url;
+		var map = this.map;
+		
+		jQuery.ajax({url: url+"/index.php/location/my_location", async: false, success: function(data) {
+			coordinates = data;
+		}});	
+		if (coordinates != "nolocation") {
+			
+			var location = coordinates.split(", ");
+			var lat = parseFloat(location[0]);
+			var lon = parseFloat(location[1]);
+			this.myMarker.setPosition(new google.maps.LatLng(lat, lon));
+		}
+		
+		this.drawMapFriends();
+	},
+	
+	calcRoute: function(routename) {
+		var url = this.url;
+		var map = this.map;
+		
+		var points;
+		jQuery.ajax({url: url+"/index.php/transport/get_route_points/"+routename, async: false, success: function(data) {
+				points = data;
+			}
+	    });
+		
+		points = $.parseJSON(points);
+		var start = points[0].coordinates;
+		var end = points[points.length-1].coordinates;
+		var waypts = [];
+		for(var i=0; i<points.length; i++) {
+			var location = points[i].coordinates.split(",");
+			var lat = parseFloat(location[0]);
+			var lon = parseFloat(location[1]);
+			waypts[i] = new google.maps.LatLng(lat, lon);
+			/*var m = new google.maps.Marker({
+				position: new google.maps.LatLng(lat, lon), 
+				map: map, // handle of the map 
+				draggable:false,
+				icon:url+"/images/icons/asterisc.png",
+				title: points[i].coordinates
+	        });*/
+		}
+		
+		var route = new google.maps.Polyline({
+			path: waypts,
+			geodesic: true,
+			strokeColor: '#FF0000',
+			strokeOpacity: 1.0,
+			strokeWeight: 2
+		});
+
+		return route;
+	},
+	
+	drawReaVaya: function() {
+		var map = this.map;
+		var url = this.url;
+		
+		var route = this.calcRoute("innercity1");
+		route.setMap(map);
+
+		var stops;
+		jQuery.ajax({url: url+"/index.php/transport/get_reavaya_busstops", async: false, success: function(data) {
+				stops = data;
+			}
+	    });
+		
+		stops = $.parseJSON(stops);
+		for(var i=0; i<stops.length; i++) {
+			var location = stops[i].coordinates.split(",");
+			var lat = parseFloat(location[0]);
+			var lon = parseFloat(location[1]);
+			var m = new google.maps.Marker({
+				position: new google.maps.LatLng(lat, lon), 
+				map: map, // handle of the map 
+				draggable:false,
+				icon:url+"/images/icons/stop.png",
+				title: stops[i].name
+	        });
+		}
+		
+		var stations;
+		jQuery.ajax({url: url+"/index.php/transport/get_reavaya_stations", async: false, success: function(data) {
+				stations = data;
+			}
+	    });
+		
+		stations = $.parseJSON(stations);
+		for(var i=0; i<stations.length; i++) {
+			var location = stations[i].coordinates.split(",");
+			var lat = parseFloat(location[0]);
+			var lon = parseFloat(location[1]);
+			var m = new google.maps.Marker({
+				position: new google.maps.LatLng(lat, lon), 
+				map: map, // handle of the map 
+				draggable:false,
+				icon:url+"/images/icons/station.png",
+				title: stations[i].name
+	        });
+		}
+	},
+	
+	centreOnReaVaya: function() {
+		var map = this.map;
+		map.setCenter(new google.maps.LatLng(-26.196861, 28.042974));
+		map.setZoom(15);
+	},
+	
+	drawMapEvents: function(date_params) {
+		var map = this.map;
+		var url = this.url;
+		
+		if (date_params.from_date != "" && date_params.to_date != "")
+		{
+			var inputFrom = document.getElementById('inputFrom');
+			var inputTo = document.getElementById('inputTo');
+			inputFrom.value = date_params.from_date;
+			inputTo.value = date_params.to_date;
+		}
+		var filter = JSON.stringify(date_params);
+		
+		var events;
+		jQuery.ajax({
+			url: url+"/index.php/events/get_all_events", 
+			type: "POST",
+			data: {"filter":filter},
+			async: false, 
+			success: function(data) {
+				events = data;
+			}
+	    });
+		
+		events = $.parseJSON(events);
+		for(var i=0; i<events.length; i++) {
+			var location = events[i].gps.split(", ");
+			var lat = parseFloat(location[0]);
+			var lon = parseFloat(location[1]);
+		    var m = new google.maps.Marker({
+				position: new google.maps.LatLng(lat, lon), 
+				map: map, // handle of the map 
+				draggable:false,
+				icon:url+"/images/icons/"+events[i].type+".png"
+	        });
+			
+			var id = events[i].id;
+			google.maps.event.addListener(m, 'click', function() {
+				map.setCenter(m.getPosition());
+				window.location = url+"index.php/events/display_event/"+id;
+			});
+		}
+	},
+	
+	drawMapFriends: function() {
+		var map = this.map;
+		var url = this.url;
+		
+		for(var i=0; i<this.userMarkers.length; i++) {
+			this.userMarkers[i].setMap(null);
+		}
+		this.userMarkers = [];
+		
+		var friends;
+		jQuery.ajax({url: url+"/index.php/friends/get_sharing_with", async: false, success: function(data) {
+				friends = data;
+			}
+	    });
+		
+		friends = $.parseJSON(friends);
+		for(var i=0; i<friends.length; i++) {
+			if (friends[i].location == "null")
+				continue;
+			var location = friends[i].location.split(", ");
+			var lat = parseFloat(location[0]);
+			var lon = parseFloat(location[1]);
+		    var m = new google.maps.Marker({
+				position: new google.maps.LatLng(lat, lon), 
+				map: map, // handle of the map 
+				draggable:false,
+				icon: url+'images/users/markers/'+friends[i].image,
+				zoomed: false
+	        });
+			
+			var enc_id = friends[i].id;
+			google.maps.event.addListener(m, 'click', function() {
+				map.setCenter(m.getPosition());
+				if (this.zoomed) {
+					this.zoomed = false;
+					map.setZoom(15);
+				}
+				else {
+					this.zoomed = true;
+					map.setZoom(18);
+				}
+			});
+			this.userMarkers.push(m);
+		}
+	},
+	
+	isSharingLocation: function(url) {
+		var sharing_location;
+		jQuery.ajax({url: url+"/index.php/location/user_status", async: false, success: function(data) {
+				sharing_location = data;
+			}
+	    });
+		return sharing_location;
+	},
+	
+    getFriends: function(url) {
+		var friends;
+		jQuery.ajax({url: url+"/index.php/friends/get_friends", async: false, success: function(data) {
+				friends = data;
+			}
+	    });
+		return $.parseJSON(friends);
+	},
+	
+	getFriendRequests: function(url) {
+		var friends;
+		jQuery.ajax({url: url+"/index.php/friends/get_all_requests", async: false, success: function(data) {
+				friends = data;
+			}
+	    });
+		return $.parseJSON(friends);
+	},
+	
+	countNotifications: function(url) {
+		var count;
+		jQuery.ajax({url: url+"index.php/notifications/count_notifications", async: false, success: function(data) {
+				count = data;
+			}
+		});
+		return count;
+	},
+	
+	getNotifications: function(url) {
+		var notifications;
+		jQuery.ajax({url: url+"/index.php/notifications/get_notifications", async: false, success: function(data) {
+				notifications = data;
+			}
+	    });
+		return $.parseJSON(notifications);
+	},
+	
+	setNotificationsSeen: function(url) {
+		jQuery.ajax({url: url+"/index.php/notifications/set_all_seen", async: false, success: function(data) {
+				var badge = document.getElementById('cntNotifications');
+				if (badge != null)
+					badge.innerHTML = "";
+			}
+	    });
+	},
+	
+	createEvent: function(url, event) {
+		window.location = url+"index.php/events/new_event/"+event;
+	},
+	
+	getEvents: function(url) {
+		var events;
+		jQuery.ajax({url: url+"/index.php/events/get_events", async: false, success: function(data) {
+				events = data;
+			}
+	    });
+		return $.parseJSON(events);
+	},
+	
+	shareLocation: function(url, id) {
+		window.location = url+"index.php/location/request_share/"+id;
+	},
+	
+	fetchShareRequests: function(url) {
+		var friends;
+		jQuery.ajax({url: url+"/index.php/location/get_share_requests", async: false, success: function(data) {
+				friends = data;
+			}
+	    });
+		return $.parseJSON(friends);
+	},
+	
+	unshareLocation: function(url, id){
+		window.location = url+"index.php/location/request_unshare/"+id;
+	},
+		
+	fetchSharingLocationWith: function(url) {
+		var friends;
+		jQuery.ajax({url: url+"/index.php/friends/get_sharing_with", async: false, success: function(data) {
+				friends = data;
+			}
+	    });
+		return $.parseJSON(friends);
+	},
+	
+	removeFriend: function(url, id) {
+		window.location = url+"/index.php/friends/request_remove_friend/"+id;
+	},
+	
+	centreOn: function(url, id) {
+		var map = this.map;
+		
+		var coordinates;
+		jQuery.ajax({url: url+"/index.php/location/location_of_friend/"+id, async: false, success: function(data) {
+			coordinates = data;
+		}});	
+		if (coordinates != "nolocation") {
+			var location = coordinates.split(", ");
+			var lat = parseFloat(location[0]);
+			var lon = parseFloat(location[1]);
+			map.setCenter({lat: lat, lng: lon});
+		}
+	},
+	
+	toggleLocationSharing: function(url) {
+		window.location = url+"/index.php/location/toggle_sharing";
+	},
+	
+	countTickets: function(url) {
+		var count;
+		jQuery.ajax({url: url+"index.php/tickets/count_tickets", async: false, success: function(data) {
+				count = data;
+			}
+		});
+		return count;
+	},
+	
+	getTickets: function(url) {
+		var tickets;
+		jQuery.ajax({url: url+"/index.php/tickets/get_tickets", async: false, success: function(data) {
+				tickets = data;
+			}
+	    });
+		return $.parseJSON(tickets);	
+	}
+};

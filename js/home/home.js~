@@ -1,0 +1,17 @@
+var HomeUI = {
+
+initialize: function(base) {
+},
+
+login: function(usr, pwd, endpoint) {
+
+    var msg;
+    jQuery.ajax({url: endpoint, async: false, success: function(data) {
+	    msg = data;
+    }});	
+    $('#ajax_error').val(msg); 
+		
+}
+
+};
+
