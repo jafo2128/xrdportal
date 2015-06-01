@@ -1,6 +1,5 @@
 # xrdportal
-This is a portal for an instrument scientist and students submitting samples at an XRD department at a University. It just queues samples and manages files as well as notices. 
-It has a public login page and a private dashboard. There are admin users and students. Students can only see their samples. Admins can add, edit and delete samples, users, notices. After admin uploads a .cif file in the sample for a student, the student can view the graphical model of the file by clicking on the file name on their dashboard. It will open a popup window that loads the JMol Java Applet. The applet might need to run in the sandbox. For Ubuntu Firefox users you will need the IcedTea plugin. Other browsers will need a Java plugin or need to have Java enabled. 
+This system just queues samples and manages files as well as notices. It has a public login page and a private dashboard. There are admin users and students. Students can only see their samples. Admins can add, edit and delete samples, users, notices. After admin uploads a .cif file in the sample for a student, the student can view the graphical model of the file by clicking on the file name on their dashboard. It will open a popup window that loads the JMol Java Applet. The applet might need to run in the sandbox. For Ubuntu Firefox users you will need the IcedTea plugin. Other browsers will need a Java plugin or need to have Java enabled. 
 
 SETUP
 
