@@ -6,15 +6,19 @@ This system just queues samples and manages files as well as notices. It has a p
 **application/config/config.php**
 
 `$config["base_url"]` must be set to your base url
+
 `$config["encryption_key"]` should be changed
 
 **application/config/database.php**
 
 `$db["default"]["database"]` must be set
+
 `$db["default"]["username"]` must be set
+
 `$db["default"]["password"]` must be set
 
 Change **images/logo.png**
+
 Change **application/views/navigation/dashboard** ln 4 to your chosen name
 
 A database dump can be found with this README called **xrdportal.sql**
